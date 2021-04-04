@@ -217,7 +217,8 @@ class BERTopic:
 
     def fit_transform(self,
                       documents: List[str],
-                      embeddings: np.ndarray = None) -> Tuple[List[int],
+                      embeddings: np.ndarray = None,
+                      umap_embeddings: np.ndarray = None) -> Tuple[List[int],
                                                               Union[np.ndarray, None]]:
         """ Fit the models on a collection of documents, generate topics, and return the docs with topics
 
@@ -263,22 +264,23 @@ class BERTopic:
         ```
         """
         check_documents_type(documents)
-        check_embeddings_shape(embeddings, documents)
+        # check_embeddings_shape(embeddings, documents)
 
         documents = pd.DataFrame({"Document": documents,
                                   "ID": range(len(documents)),
                                   "Topic": None})
 
         # Extract embeddings
-        if not any([isinstance(embeddings, np.ndarray), isinstance(embeddings, csr_matrix)]):
-            self.embedding_model = self._select_embedding_model()
-            embeddings = self._extract_embeddings(documents.Document, verbose=self.verbose)
-            logger.info("Transformed documents to Embeddings")
-        else:
-            self.custom_embeddings = True
+        # if not any([isinstance(embeddings, np.ndarray), isinstance(embeddings, csr_matrix)]):
+        #     self.embedding_model = self._select_embedding_model()
+        #     embeddings = self._extract_embeddings(documents.Document, verbose=self.verbose)
+        #     logger.info("Transformed documents to Embeddings")
+        # else:
+        #     self.custom_embeddings = True
 
         # Reduce dimensionality with UMAP
-        umap_embeddings = self._reduce_dimensionality(embeddings)
+        if umap_embeddings is None:
+            umap_embeddings = self._reduce_dimensionality(embeddings)
 
         # Cluster UMAP embeddings with HDBSCAN
         documents, probabilities = self._cluster_embeddings(umap_embeddings, documents)
@@ -1085,7 +1087,8 @@ class BERTopic:
             mapped_predictions.append(prediction)
         return mapped_predictions
 
-    def _reduce_dimensionality(self, embeddings: Union[np.ndarray, csr_matrix]) -> np.ndarray:
+    def _reduce_dimensionality(self,
+                                embeddings: Union[np.ndarray, csr_matrix]) -> np.ndarray:
         """ Reduce dimensionality of embeddings using UMAP and train a UMAP model
 
         Arguments:
@@ -1101,6 +1104,7 @@ class BERTopic:
                                         low_memory=self.low_memory).fit(embeddings)
         else:
             self.umap_model.fit(embeddings)
+
         umap_embeddings = self.umap_model.transform(embeddings)
         logger.info("Reduced dimensionality with UMAP")
         return np.nan_to_num(umap_embeddings)
@@ -1244,18 +1248,25 @@ class BERTopic:
             topics: The top words per topic
         """
         if c_tf_idf is None:
-            c_tf_idf = self.c_tf_idf.toarray()
-        else:
-            c_tf_idf = c_tf_idf.toarray()
+            c_tf_idf = self.c_tf_idf
 
         if labels is None:
             labels = sorted(list(self.topic_sizes.keys()))
 
         # Get top 30 words per topic based on c-TF-IDF score
-        indices = c_tf_idf.argsort()[:, -30:]
-        topics = {label: [(words[j], c_tf_idf[i][j])
-                          for j in indices[i]][::-1]
-                  for i, label in enumerate(labels)}
+        if self.low_memory:
+            indices = [row.toarray().flatten().argsort()[-30:] for row in c_tf_idf]
+
+            topics = {label: [(words[j], c_tf_idf[i].getcol(j).toarray()[0][0])
+                            for j in indices[i]][::-1]
+                    for i, label in enumerate(labels)}
+        else:
+            c_tf_idf = c_tf_idf.toarray()
+            indices = c_tf_idf.argsort()[:, -30:]
+                
+            topics = {label: [(words[j], c_tf_idf[i][j])
+                            for j in indices[i]][::-1]
+                    for i, label in enumerate(labels)}
 
         # Extract word embeddings for the top 30 words per topic and compare it
         # with the topic embedding to keep only the words most similar to the topic embedding

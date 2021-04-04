@@ -264,19 +264,25 @@ class BERTopic:
         ```
         """
         check_documents_type(documents)
-        # check_embeddings_shape(embeddings, documents)
+
+        if embeddings is not None:
+            check_embeddings_shape(embeddings, documents)
+        else:
+            check_embeddings_shape(umap_embeddings, documents)
 
         documents = pd.DataFrame({"Document": documents,
                                   "ID": range(len(documents)),
                                   "Topic": None})
 
         # Extract embeddings
-        # if not any([isinstance(embeddings, np.ndarray), isinstance(embeddings, csr_matrix)]):
-        #     self.embedding_model = self._select_embedding_model()
-        #     embeddings = self._extract_embeddings(documents.Document, verbose=self.verbose)
-        #     logger.info("Transformed documents to Embeddings")
-        # else:
-        #     self.custom_embeddings = True
+        if not any([isinstance(embeddings, np.ndarray), isinstance(embeddings, csr_matrix)]):
+            self.embedding_model = self._select_embedding_model()
+            embeddings = self._extract_embeddings(documents.Document, verbose=self.verbose)
+            logger.info("Transformed documents to Embeddings")
+        elif self.embedding_model is not None:
+            self.embedding_model = self._select_embedding_model()
+        else:
+            self.custom_embeddings = True
 
         # Reduce dimensionality with UMAP
         if umap_embeddings is None:

@@ -1209,11 +1209,15 @@ class BERTopic:
         """
         documents = self._preprocess_text(documents_per_topic.Document.values)
 
+        logger.info("Transforming documents")
         if fit:
-            self.vectorizer_model.fit(documents)
+            X = self.vectorizer_model.fit_transform(tqdm(documents))
+        else:
+            X = self.vectorizer_model.transform(tqdm(documents))
 
         words = self.vectorizer_model.get_feature_names()
-        X = self.vectorizer_model.transform(documents)
+
+        logger.info("Fitting c-tfidf")
 
         if fit:
             self.transformer = ClassTFIDF().fit(X, n_samples=m)

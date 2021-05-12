@@ -267,7 +267,7 @@ class BERTopic:
                                   "Topic": None})
 
         # Extract embeddings
-        if umap_embeddings is None and umap_embeddings is None and not any([isinstance(embeddings, np.ndarray), isinstance(embeddings, csr_matrix)]):
+        if umap_embeddings is None and embeddings is None:
             self.embedding_model = select_backend(self.embedding_model,
                                                   language=self.language)
             embeddings = self._extract_embeddings(documents.Document,
@@ -275,9 +275,6 @@ class BERTopic:
                                                   verbose=self.verbose)
             logger.info("Transformed documents to Embeddings")
         elif self.embedding_model is not None:
-            self.embedding_model = self._select_embedding_model()
-        else:
-            if self.embedding_model is not None:
                 self.embedding_model = select_backend(self.embedding_model,
                                                       language=self.language)
 

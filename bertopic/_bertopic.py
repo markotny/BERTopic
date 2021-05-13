@@ -77,6 +77,8 @@ class BERTopic:
                  hdbscan_model: hdbscan.HDBSCAN = None,
                  vectorizer_model: CountVectorizer = None,
                  verbose: bool = False,
+                 test_sample = None,
+                 test_sample_frac = 0.1
                  ):
         """BERTopic initialization
 
@@ -131,6 +133,8 @@ class BERTopic:
         self.low_memory = low_memory
         self.calculate_probabilities = calculate_probabilities
         self.verbose = verbose
+        self.test_sample = test_sample
+        self.test_sample_frac = test_sample_frac
 
         # Embedding model
         self.language = language if not embedding_model else None
@@ -294,7 +298,7 @@ class BERTopic:
 
         predictions = documents.Topic.to_list()
 
-        return predictions, probabilities
+        return predictions, probabilities, documents
 
     def transform(self,
                   documents: Union[str, List[str]],
@@ -1293,6 +1297,12 @@ class BERTopic:
         """
         self.hdbscan_model.fit(umap_embeddings)
         documents['Topic'] = self.hdbscan_model.labels_
+
+        if self.test_sample is not None:
+            documents = documents.groupby('Topic', as_index=False).apply(lambda x:
+                x.sample(frac=self.test_sample_frac, random_state=1) if len(x) > self.test_sample / self.test_sample_frac
+                else x.sample(n=self.test_sample, random_state=1) if len(x) > self.test_sample
+                else x).reset_index()
 
         if self.calculate_probabilities:
             probabilities = hdbscan.all_points_membership_vectors(self.hdbscan_model)
